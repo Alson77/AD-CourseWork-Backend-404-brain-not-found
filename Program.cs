@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using VehiclePartsBackend.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,9 +28,23 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        // Prevent circular reference errors (e.g. Review -> Customer -> Review)
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
+builder.Services.AddSingleton<VehiclePartsBackend.Services.IInvoiceEmailService, VehiclePartsBackend.Services.InvoiceEmailService>();
 builder.Services.AddEndpointsApiExplorer();
-// builder.Services.AddSwaggerGen();
+builder.Services.AddHostedService<VehiclePartsBackend.Services.NotificationBackgroundService>();
+
+// ── PostgreSQL Database Connection ────────────────────────────────────
+// Make sure "DefaultConnection" in appsettings.json has your correct password
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// ─────────────────────────────────────────────────────────────────────
 
 // ── CORS: allow React frontend at localhost:5173–5180 ──────────────
 builder.Services.AddCors(options =>
