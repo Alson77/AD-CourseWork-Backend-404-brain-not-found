@@ -10,6 +10,12 @@ namespace VehiclePartsBackend.Models
         public decimal Discount { get; set; } = 0;
         public decimal Subtotal { get; set; }
         public decimal Total { get; set; }
+        
+        public string PaymentStatus { get; set; } = "Paid";
+        public DateTime? DueDate { get; set; }
+        public decimal PaidAmount { get; set; }
+        public decimal BalanceAmount { get; set; }
+
         public List<InvoiceItem> Items { get; set; } = new();
     }
 }

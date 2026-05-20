@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using VehiclePartsBackend.Data;
 using VehiclePartsBackend.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace VehiclePartsBackend.Controllers
 {
@@ -7,29 +10,39 @@ namespace VehiclePartsBackend.Controllers
     [Route("api/[controller]")]
     public class PartsController : ControllerBase
     {
-        // ── In-memory store (runs without PostgreSQL) ──────────────────────
-        // To switch to PostgreSQL: inject AppDbContext and replace _parts with _db.Parts
-        // ──────────────────────────────────────────────────────────────────
-        private static int _nextId = 4;
-        private static readonly List<Part> _parts = new()
+        private readonly AppDbContext _context;
+
+        public PartsController(AppDbContext context)
         {
-            new Part { Id = 1, PartName = "Oil Filter",  Brand = "Bosch",  Category = "Filters",    Price = 850.00m,  StockQuantity = 50, CreatedDate = new DateTime(2026,1,1,0,0,0,DateTimeKind.Utc) },
-            new Part { Id = 2, PartName = "Air Filter",  Brand = "Denso",  Category = "Filters",    Price = 650.00m,  StockQuantity = 35, CreatedDate = new DateTime(2026,1,2,0,0,0,DateTimeKind.Utc) },
-            new Part { Id = 3, PartName = "Brake Pads",  Brand = "Brembo", Category = "Brakes",     Price = 2200.00m, StockQuantity = 20, CreatedDate = new DateTime(2026,1,3,0,0,0,DateTimeKind.Utc) },
-        };
+            _context = context;
+        }
 
         // GET api/parts
         [HttpGet]
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
-            return Ok(_parts);
+            var parts = await _context.Parts.ToListAsync();
+            return Ok(parts);
+        }
+
+        [HttpGet("fix-typo")]
+        [AllowAnonymous]
+        public async Task<IActionResult> FixTypo()
+        {
+            var parts = await _context.Parts.Where(p => p.PartName.Contains("Brae")).ToListAsync();
+            foreach (var p in parts)
+            {
+                p.PartName = p.PartName.Replace("Brae", "Brake");
+            }
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Fixed typo", count = parts.Count });
         }
 
         // GET api/parts/{id}
         [HttpGet("{id}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var part = _parts.FirstOrDefault(p => p.Id == id);
+            var part = await _context.Parts.FindAsync(id);
             if (part == null)
                 return NotFound(new { message = $"Part with ID {id} was not found." });
             return Ok(part);
@@ -37,7 +50,7 @@ namespace VehiclePartsBackend.Controllers
 
         // POST api/parts
         [HttpPost]
-        public IActionResult Create([FromBody] Part part)
+        public async Task<IActionResult> Create([FromBody] Part part)
         {
             if (string.IsNullOrWhiteSpace(part.PartName))
                 return BadRequest(new { message = "Part name is required." });
@@ -46,18 +59,18 @@ namespace VehiclePartsBackend.Controllers
             if (part.StockQuantity < 0)
                 return BadRequest(new { message = "Stock quantity cannot be negative." });
 
-            part.Id = _nextId++;
             part.CreatedDate = DateTime.UtcNow;
-            _parts.Add(part);
+            _context.Parts.Add(part);
+            await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetById), new { id = part.Id }, part);
         }
 
         // PUT api/parts/{id}
         [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromBody] Part updated)
+        public async Task<IActionResult> Update(int id, [FromBody] Part updated)
         {
-            var part = _parts.FirstOrDefault(p => p.Id == id);
+            var part = await _context.Parts.FindAsync(id);
             if (part == null)
                 return NotFound(new { message = $"Part with ID {id} was not found." });
 
@@ -74,18 +87,20 @@ namespace VehiclePartsBackend.Controllers
             part.Price         = updated.Price;
             part.StockQuantity = updated.StockQuantity;
 
+            await _context.SaveChangesAsync();
             return Ok(part);
         }
 
         // DELETE api/parts/{id}
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var part = _parts.FirstOrDefault(p => p.Id == id);
+            var part = await _context.Parts.FindAsync(id);
             if (part == null)
                 return NotFound(new { message = $"Part with ID {id} was not found." });
 
-            _parts.Remove(part);
+            _context.Parts.Remove(part);
+            await _context.SaveChangesAsync();
             return Ok(new { message = "Part deleted successfully." });
         }
     }

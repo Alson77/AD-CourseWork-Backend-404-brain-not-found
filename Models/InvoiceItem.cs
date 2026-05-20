@@ -5,6 +5,7 @@ namespace VehiclePartsBackend.Models
     {
         public int Id { get; set; }
         public int InvoiceId { get; set; }
+        public int? PartId { get; set; } // nullable — allows manual invoice items without a catalog part
         public string PartName { get; set; } = string.Empty;
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
